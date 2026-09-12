@@ -1,32 +1,35 @@
 # Customer Support AI Agent
 
-> A production-oriented AI customer support agent built with **Amazon Bedrock AgentCore, Strands Agents, Amazon Bedrock Knowledge Bases, AgentCore Memory, AgentCore Browser, Code Interpreter, and MCP-based Gateway tools**.
+> A production-oriented AI customer support agent built with **Amazon Bedrock AgentCore, Strands Agents, Amazon Bedrock Knowledge Bases, AgentCore Memory, AgentCore Browser, AgentCore Code Interpreter, and MCP-based AgentCore Gateway tools**.
 
-This project demonstrates how modern AI agent infrastructure can be combined to build an intelligent customer support system capable of answering product and policy questions, retrieving customer and order information, calculating loyalty discounts, interacting with web pages, processing refund workflows, and maintaining long-term customer context.
+This project demonstrates how modern AI agent infrastructure can be combined to build an intelligent customer support system capable of answering product and policy questions, retrieving customer and order information, calculating loyalty discounts, interacting with live webpages, processing refund workflows, and maintaining long-term customer context across conversations.
 
-The agent is deployed as an **Amazon Bedrock AgentCore Runtime** and uses a modular tool architecture so that knowledge retrieval, customer operations, browser automation, code execution, and memory can be handled by specialized components.
+The agent is deployed as an **Amazon Bedrock AgentCore Runtime** and uses a modular tool architecture in which knowledge retrieval, customer operations, browser automation, code execution, backend integrations, and memory are handled by specialized components.
 
 ---
 
 ## Overview
 
-Traditional customer support systems typically depend on predefined workflows and static FAQ pages.
+Traditional customer support applications often depend on static FAQ pages and predefined workflows.
 
-This project takes a different approach by combining a **reasoning-capable AI agent** with specialized tools and managed AWS services.
+This project takes a more agentic approach by combining a reasoning-capable **Strands Agent** with specialized AWS services and external tools.
 
 The agent can:
 
-* Answer product and support questions using a Bedrock Knowledge Base
+* Answer product and support questions using an Amazon Bedrock Knowledge Base
 * Retrieve customer and order information
+* Check order status and tracking information
 * Initiate and check refund workflows
 * Generate return-label information
-* Calculate loyalty discounts dynamically
-* Execute calculations through AgentCore Code Interpreter
-* Browse webpages through AgentCore Browser
+* Calculate loyalty discounts using AgentCore Code Interpreter
+* Browse live webpages using AgentCore Browser
 * Use MCP tools exposed through AgentCore Gateway
-* Remember relevant customer information across conversations
-* Maintain session and customer-specific context
-* Respond through an HTTP-based AgentCore Runtime
+* Retrieve relevant long-term customer memories
+* Persist customer interactions for future conversations
+* Maintain customer-specific context across sessions
+* Run as an HTTP-based Amazon Bedrock AgentCore Runtime
+
+The architecture is intentionally modular so individual backend capabilities can be replaced or extended without rewriting the core agent.
 
 ---
 
@@ -52,11 +55,10 @@ The agent can:
           │                 │                  │
           ▼                 ▼                  ▼
  ┌────────────────┐ ┌────────────────┐ ┌─────────────────┐
- │ Bedrock        │ │ AgentCore     │ │ AgentCore       │
+ │ Amazon Bedrock │ │ AgentCore     │ │ AgentCore       │
  │ Knowledge Base │ │ Memory        │ │ Browser         │
  │                │ │               │ │ + Playwright    │
  └────────────────┘ └────────────────┘ └─────────────────┘
-          │                 │                  │
           │                 │                  │
           ▼                 ▼                  ▼
    Product / Policy    Customer Context    Live Web Pages
@@ -93,25 +95,31 @@ The agent can:
 
 ### 1. Knowledge Base Search
 
-The agent uses an Amazon Bedrock Knowledge Base to retrieve relevant information before answering questions related to:
+The agent uses an **Amazon Bedrock Knowledge Base** to retrieve relevant information before answering business-specific questions.
+
+Knowledge Base retrieval is used for topics such as:
 
 * Products
-* Product policies
-* Customer support information
+* Product specifications
+* Return policies
+* Warranty information
 * Loyalty programs
+* Support policies
 * Other indexed business knowledge
 
-The knowledge retrieval tool uses the Bedrock Runtime `retrieve` API and returns relevant document chunks to the agent.
+The application uses the Bedrock Runtime retrieval functionality to obtain relevant document content and provide grounded information to the agent.
 
-This helps prevent the agent from relying solely on model knowledge when answering business-specific questions.
+The system prompt explicitly instructs the agent to use the Knowledge Base for business-specific knowledge instead of relying on general model knowledge.
+
+This helps reduce hallucination when answering questions about company-specific policies and products.
 
 ---
 
-### 2. Customer & Order Information
+## 2. Customer and Order Information
 
-Customer-specific information is exposed through Gateway/MCP tools backed by AWS Lambda.
+Customer-specific capabilities are exposed through **AgentCore Gateway / MCP tools** backed by AWS Lambda.
 
-The current demonstration backend provides:
+The demonstration backend provides capabilities for:
 
 * Customer profiles
 * Customer order history
@@ -120,27 +128,46 @@ The current demonstration backend provides:
 * Tracking information
 * Estimated delivery information
 
-Example supported routes:
+The architecture separates agent reasoning from backend business logic:
 
 ```text
-GET /orders/{order_id}
-
-GET /customers/{customer_id}/orders
-
-GET /customers/{customer_id}
+Customer Request
+       │
+       ▼
+Strands Agent
+       │
+       ▼
+MCP Client
+       │
+       ▼
+AgentCore Gateway
+       │
+       ▼
+AWS Lambda
+       │
+       ▼
+Customer / Order Data
 ```
 
-The current Lambda implementation uses mock in-memory data for demonstration purposes.
+The current backend uses demonstration data.
 
-A production deployment could replace this layer with DynamoDB, Aurora, RDS, or another persistent transactional data source without changing the overall agent architecture.
+A production implementation could replace the Lambda data layer with services such as:
+
+* Amazon DynamoDB
+* Amazon Aurora
+* Amazon RDS
+* Existing enterprise APIs
+* Other transactional data systems
+
+The agent architecture would remain largely unchanged.
 
 ---
 
-### 3. Loyalty Discount Calculator
+## 3. Loyalty Discount Calculator
 
-The agent includes a dedicated loyalty-discount tool powered by **Amazon Bedrock AgentCore Code Interpreter**.
+The project includes a dedicated loyalty-discount capability that uses **Amazon Bedrock AgentCore Code Interpreter** for deterministic calculations.
 
-The calculator considers:
+The calculation can consider:
 
 * Customer loyalty points
 * Loyalty tier
@@ -149,17 +176,36 @@ The calculator considers:
 * Points redemption
 * Tier-based discounts
 * Discount limits
-* Points earned from the purchase
+* Points earned from purchases
 
-Current product earning rates include different values for standard, device, and fresh categories.
-
-Supported loyalty tiers include:
+The demonstration supports loyalty tiers such as:
 
 * Silver
 * Gold
 * Platinum
 
-The calculation is intentionally executed through Code Interpreter rather than relying on the language model to perform the business calculation itself.
+Instead of asking the language model to perform business calculations directly, the agent delegates calculation logic to executable code.
+
+The conceptual flow is:
+
+```text
+Customer Request
+       │
+       ▼
+Strands Agent
+       │
+       ▼
+Loyalty Discount Tool
+       │
+       ▼
+AgentCore Code Interpreter
+       │
+       ▼
+Deterministic Calculation
+       │
+       ▼
+Result
+```
 
 This provides a useful separation between:
 
@@ -170,72 +216,86 @@ Tool selection
       ↓
 Code execution
       ↓
-Deterministic calculation
+Deterministic result
 ```
 
 ---
 
-### 4. AgentCore Browser
+## 4. AgentCore Browser
 
-The agent can use **AgentCore Browser** for requests that require live webpage interaction.
+The agent integrates **Amazon Bedrock AgentCore Browser** for tasks requiring live webpage interaction.
 
-The project integrates browser functionality through Playwright and AgentCore Browser.
+Browser capabilities are exposed through the Strands tool system and use Playwright-based browser automation.
 
-Browser-related requests are intentionally separated from knowledge-base questions.
+The system prompt distinguishes between static business knowledge and live web information.
 
 For example:
 
 ```text
-"Tell me about the return policy."
+"What is the return policy?"
 ```
 
-uses the Knowledge Base.
+should use:
 
-Whereas a request such as:
+```text
+Amazon Bedrock Knowledge Base
+```
+
+while a request such as:
 
 ```text
 "Open this webpage and check the current information."
 ```
 
-can use the Browser tool.
+can use:
 
-This separation helps the agent select the appropriate information source based on the task.
+```text
+AgentCore Browser
+       ↓
+Playwright
+       ↓
+Live Webpage
+```
+
+The agent is instructed not to claim that it visited a webpage unless the Browser tool was actually used.
 
 ---
 
-### 5. AgentCore Gateway + MCP
+## 5. AgentCore Gateway + MCP
 
-The project uses an **AgentCore Gateway** as the integration layer for external business tools.
+The project uses **Amazon Bedrock AgentCore Gateway** as the integration layer for external business capabilities.
 
-The Strands agent connects to the Gateway through an MCP client:
+The Strands agent connects to the Gateway through an MCP client.
 
 ```text
 Strands Agent
-     │
-     ▼
+      │
+      ▼
 MCP Client
-     │
-     ▼
+      │
+      ▼
 AgentCore Gateway
-     │
-     ├── Order tools
-     │
-     └── Refund tools
+      │
+      ├── Order Tools
+      │
+      └── Refund Tools
 ```
 
-This architecture makes backend capabilities available to the agent without embedding all business logic directly into the agent application.
+This architecture allows backend functionality to be exposed as tools without embedding all business logic directly inside the AI agent.
+
+It also provides a modular foundation for adding additional business capabilities later.
 
 ---
 
-## Refund Processing
+# Refund Processing
 
-The refund backend exposes three MCP-compatible tools:
+The demonstration refund backend exposes MCP-compatible operations for refund workflows.
 
-### `initiate_refund`
+## `initiate_refund`
 
 Starts a refund request for an order.
 
-Inputs:
+Example input:
 
 ```json
 {
@@ -245,9 +305,13 @@ Inputs:
 }
 ```
 
-### `check_refund_status`
+---
 
-Checks the state of an existing refund.
+## `check_refund_status`
+
+Checks the status of an existing refund.
+
+Example input:
 
 ```json
 {
@@ -255,9 +319,13 @@ Checks the state of an existing refund.
 }
 ```
 
-### `get_return_label`
+---
 
-Generates simulated return-label information.
+## `get_return_label`
+
+Generates simulated return-label information for an order.
+
+Example input:
 
 ```json
 {
@@ -265,54 +333,155 @@ Generates simulated return-label information.
 }
 ```
 
-The current implementation is a demonstration backend and does not connect to a real payment processor or fulfillment system.
+The current implementation is a demonstration backend and does not connect to a real payment processor or shipping provider.
+
+A production implementation could integrate these tools with actual payment, fulfillment, and shipping systems.
 
 ---
 
-## Long-Term Memory
+# Long-Term Customer Memory
 
-The agent uses **Amazon Bedrock AgentCore Memory** to maintain customer context between interactions.
+One of the key features of the project is **Amazon Bedrock AgentCore Memory**.
 
-The implementation uses a `MemoryHook` abstraction that:
+The agent uses a custom `MemoryHook` to retrieve and persist customer context.
+
+The memory architecture supports customer-specific information such as:
+
+* Preferences
+* Previously stated facts
+* Relevant conversation context
+
+The current memory configuration includes semantic facts and user preferences.
+
+Example namespaces:
+
+```text
+cs_agent/{actorId}/facts
+cs_agent/{actorId}/preferences
+```
+
+For a customer such as:
+
+```text
+CUST-FINAL
+```
+
+the runtime resolves these to:
+
+```text
+cs_agent/CUST-FINAL/facts
+cs_agent/CUST-FINAL/preferences
+```
+
+This keeps memory isolated by customer actor ID.
+
+---
+
+## Memory Retrieval Flow
+
+When a user message arrives, the `MemoryHook`:
 
 1. Identifies the customer
-2. Identifies the conversation session
-3. Retrieves relevant memories
-4. Adds customer context to the agent prompt
-5. Executes the agent
-6. Saves the completed interaction
+2. Extracts the incoming user query
+3. Resolves the configured memory namespaces
+4. Retrieves relevant memories
+5. Adds the retrieved context to the user message
+6. Allows the Strands agent to use that context when responding
 
 Conceptually:
 
 ```text
-Previous conversations
-        │
-        ▼
+Customer Message
+       │
+       ▼
+MemoryHook
+       │
+       ▼
 AgentCore Memory
-        │
-        ▼
-Memory retrieval
-        │
-        ▼
-Customer Context
-        │
-        ▼
+       │
+       ▼
+Relevant Customer Context
+       │
+       ▼
 Strands Agent
-        │
-        ▼
-New interaction
-        │
-        ▼
-Memory persistence
+       │
+       ▼
+Customer Response
 ```
-
-This allows the support agent to become more context-aware across conversations.
 
 ---
 
-## Agent Reasoning Flow
+## Memory Persistence
 
-A typical request follows this process:
+After an agent invocation completes, the memory hook uses the Strands `AfterInvocationEvent`.
+
+The callback:
+
+```python
+registry.add_callback(
+    AfterInvocationEvent,
+    self.save_support_interaction,
+)
+```
+
+extracts the relevant user and assistant messages from:
+
+```python
+event.agent.messages
+```
+
+and persists the interaction using AgentCore Memory.
+
+This keeps memory persistence inside the agent lifecycle rather than requiring a manual memory-save call from the runtime entrypoint.
+
+The resulting lifecycle is:
+
+```text
+User Request
+      │
+      ▼
+Memory Retrieval
+      │
+      ▼
+Agent Invocation
+      │
+      ▼
+Agent Response
+      │
+      ▼
+AfterInvocationEvent
+      │
+      ▼
+Memory Persistence
+```
+
+---
+
+## Cross-Session Memory
+
+The implementation was tested using the same customer ID across different sessions.
+
+For example, a customer can state:
+
+```text
+Remember that I prefer Japan for travel and I like wireless headphones.
+```
+
+Later, in a new session, the customer can ask:
+
+```text
+What travel destination do I prefer, and what type of product do I like?
+```
+
+The deployed runtime can retrieve the previously stored customer context and respond with the remembered preferences.
+
+This demonstrates that the memory is associated with the customer actor rather than being limited to a single runtime session.
+
+---
+
+# Agent Reasoning Flow
+
+A typical customer request follows this process:
 
 ```text
 Customer Request
@@ -323,52 +492,96 @@ AgentCore Runtime
        ▼
 Strands Agent
        │
-       ├── Need business knowledge?
-       │        └──► Knowledge Base
+       ├── Business knowledge required?
+       │        └──► Amazon Bedrock Knowledge Base
        │
-       ├── Need customer/order data?
-       │        └──► Gateway / MCP
+       ├── Customer/order information required?
+       │        └──► AgentCore Gateway / MCP
        │
-       ├── Need refund operation?
+       ├── Refund operation required?
        │        └──► Refund Lambda
        │
-       ├── Need deterministic calculation?
-       │        └──► Code Interpreter
+       ├── Deterministic calculation required?
+       │        └──► AgentCore Code Interpreter
        │
-       ├── Need live webpage interaction?
+       ├── Live webpage required?
        │        └──► AgentCore Browser
        │
-       └── Need previous customer context?
+       └── Previous customer context required?
                 └──► AgentCore Memory
 ```
 
-The system prompt explicitly instructs the agent to use the appropriate tool instead of inventing information.
+The system prompt instructs the agent to select the appropriate tool and avoid inventing customer, order, refund, product, or policy information.
 
 ---
 
-## Technology Stack
+# System Prompt Design
 
-| Technology                    | Purpose                           |
-| ----------------------------- | --------------------------------- |
-| Python 3.14                   | Application runtime               |
-| Strands Agents                | Agent orchestration               |
-| Amazon Bedrock                | Foundation model infrastructure   |
-| Amazon Nova 2 Lite            | Agent model                       |
-| Bedrock AgentCore Runtime     | Agent deployment/runtime          |
-| AgentCore Memory              | Long-term customer context        |
-| AgentCore Browser             | Web interaction                   |
-| AgentCore Code Interpreter    | Deterministic code execution      |
-| AgentCore Gateway             | External tool integration         |
-| MCP                           | Tool communication                |
-| Amazon Bedrock Knowledge Base | Business knowledge retrieval      |
-| AWS Lambda                    | Backend business tools            |
-| Playwright                    | Browser automation                |
-| uv                            | Python dependency management      |
-| AWS CDK                       | Infrastructure/deployment support |
+The agent is instructed to follow several important rules.
+
+### Ground business-specific answers
+
+For product information, policies, warranties, loyalty benefits, and other Knowledge Base content:
+
+```text
+Always call search_knowledge_base before answering.
+```
+
+### Use the Browser for live web requests
+
+For requests requiring live webpage access:
+
+```text
+Always use AgentCore Browser before answering.
+```
+
+### Use backend tools for customer-specific data
+
+For orders, refunds, customer information, and similar operations:
+
+```text
+Use the appropriate Gateway tools.
+```
+
+### Avoid fabricated information
+
+The agent is explicitly instructed not to invent:
+
+* Customer information
+* Order information
+* Refund information
+* Loyalty information
+* Product information
+* Business policies
+
+This provides a basic grounding and tool-use policy at the application level.
 
 ---
 
-## Project Structure
+# Technology Stack
+
+| Technology                    | Purpose                                     |
+| ----------------------------- | ------------------------------------------- |
+| Python 3.14                   | Application runtime                         |
+| Strands Agents                | Agent orchestration                         |
+| Amazon Bedrock                | Foundation model infrastructure             |
+| Amazon Nova 2 Lite            | Agent foundation model                      |
+| Bedrock AgentCore Runtime     | Managed agent runtime                       |
+| AgentCore Memory              | Long-term customer context                  |
+| AgentCore Browser             | Live webpage interaction                    |
+| AgentCore Code Interpreter    | Deterministic code execution                |
+| AgentCore Gateway             | External tool integration                   |
+| MCP                           | Tool communication                          |
+| Amazon Bedrock Knowledge Base | Business knowledge retrieval                |
+| AWS Lambda                    | Backend business operations                 |
+| Playwright                    | Browser automation                          |
+| uv                            | Python dependency management                |
+| AWS CDK                       | AgentCore infrastructure/deployment support |
+| CloudWatch                    | Runtime logging and observability           |
+
+---
+
+# Project Structure
 
 ```text
 customer-support-ai-agent/
@@ -387,18 +600,55 @@ customer-support-ai-agent/
 ├── product_catalog.txt
 ├── order-tracker.zip
 ├── refund-processor.zip
-│
 ├── pyproject.toml
 ├── uv.lock
+├── reflection.md
 ├── README.md
 └── .gitignore
 ```
 
+### Important files
+
+#### `main.py`
+
+Contains:
+
+* AgentCore application entrypoint
+* Strands Agent configuration
+* Knowledge Base tool
+* Loyalty discount tool
+* AgentCore Browser integration
+* AgentCore Memory integration
+* MCP Gateway integration
+* Memory lifecycle hooks
+
+#### `agentcore/agentcore.json`
+
+Defines the AgentCore runtime configuration.
+
+#### `agentcore/aws-targets.json`
+
+Defines the AWS deployment target.
+
+#### `lambda/`
+
+Contains demonstration backend Lambda implementations.
+
+#### `reflection.md`
+
+Documents implementation decisions, a concrete technical challenge and resolution, and production considerations from the project.
+
 ---
 
-## AgentCore Configuration
+# AgentCore Configuration
 
-The AgentCore runtime is configured as:
+The project uses the AgentCore configuration:
+
+```text
+agentcore/agentcore.json
+```
+
+The primary runtime configuration is:
 
 ```json
 {
@@ -408,40 +658,41 @@ The AgentCore runtime is configured as:
 }
 ```
 
-Runtime configuration:
+Runtime settings:
 
 ```text
 Runtime:        CustomerSupport
 Build:          CodeZip
 Entrypoint:     main.py
+Code Location:  .
 Python:         3.14
 Network Mode:   PUBLIC
 Protocol:       HTTP
 ```
 
-The project targets AWS:
+AWS deployment target:
 
 ```text
 Region: us-east-1
 ```
 
-AWS resource identifiers are intentionally kept out of this README where possible. Environment- or deployment-specific identifiers should be configured in the project rather than hard-coded into public documentation.
+Environment-specific resource identifiers are intentionally not documented here where they may change between deployments.
 
 ---
 
-## Installation
+# Installation
 
-### Prerequisites
+## Prerequisites
 
-You should have:
+The following are required:
 
 * Python 3.14+
 * AWS CLI
-* AWS credentials with the required permissions
+* AWS credentials with appropriate permissions
 * `uv`
 * AgentCore Starter Toolkit
 * Access to Amazon Bedrock
-* An appropriately configured AWS environment
+* An AWS environment configured for the required AgentCore services
 
 Verify Python:
 
@@ -449,13 +700,13 @@ Verify Python:
 python --version
 ```
 
-Verify AWS:
+Verify AWS identity:
 
 ```bash
 aws sts get-caller-identity
 ```
 
-Verify the region:
+Verify the configured region:
 
 ```bash
 aws configure get region
@@ -463,16 +714,20 @@ aws configure get region
 
 ---
 
-## Install Dependencies
-
-Clone the repository:
+# Clone the Repository
 
 ```bash
 git clone https://github.com/frazcodes/customer-support-ai-agent.git
 cd customer-support-ai-agent
 ```
 
-Create/sync the environment:
+---
+
+# Install Dependencies
+
+The project uses `uv` for dependency management.
+
+Synchronize the environment:
 
 ```bash
 uv sync
@@ -486,63 +741,63 @@ source .venv/bin/activate
 
 ---
 
-## Configuration
+# Configuration
 
-The application currently reads its main AWS integration configuration from `main.py`.
-
-The important components are:
+The main application integrates several AWS resources:
 
 ```text
-AWS Region
+Amazon Bedrock model
+Amazon Bedrock Knowledge Base
 AgentCore Memory
-Bedrock Knowledge Base
 AgentCore Gateway
-Amazon Bedrock Model
+AgentCore Browser
+AgentCore Code Interpreter
 ```
 
-For a production deployment, these values should preferably be moved into environment variables or a secure configuration mechanism rather than committed directly to source code.
+The current implementation contains the integration configuration required by the deployed demonstration environment.
+
+For production systems, environment-specific values should preferably be supplied through secure configuration mechanisms rather than hard-coded application source.
+
+Recommended production options include:
+
+* Environment variables
+* AWS Systems Manager Parameter Store
+* AWS Secrets Manager
+* Deployment-time configuration
+* Infrastructure-as-code parameters
 
 ---
 
-## Running Locally
+# Local Validation
+
+Before deployment, basic Python validation can be performed with:
+
+```bash
+python -m py_compile main.py
+```
+
+Dependencies can be validated with:
+
+```bash
+uv sync
+```
+
+For project changes, it is recommended to test the affected tool or workflow before deploying the complete AgentCore runtime.
+
+---
+
+# Deploying to Amazon Bedrock AgentCore
 
 The project uses:
-
-```python
-app = BedrockAgentCoreApp()
-```
-
-and exposes the agent through the AgentCore entrypoint:
-
-```python
-@app.entrypoint
-async def invoke(payload, context=None):
-```
-
-The application can therefore be deployed and invoked through AgentCore.
-
-The project also contains a local CLI implementation for development/testing.
-
----
-
-## Deploying to AgentCore
-
-The project uses the AgentCore configuration located in:
 
 ```text
 agentcore/agentcore.json
 agentcore/aws-targets.json
 ```
 
-The configured runtime is:
+to define the deployment configuration.
 
-```text
-CustomerSupport
-```
-
-After AWS credentials and dependencies are configured, deployment can be performed through the AgentCore CLI.
-
-Check deployment status:
+Check the current deployment:
 
 ```bash
 agentcore status
@@ -554,7 +809,13 @@ Deploy:
 agentcore deploy
 ```
 
-Invoke the deployed agent:
+A successful deployment produces an AgentCore Runtime that can then be invoked through the AgentCore CLI.
+
+---
+
+# Invoking the Agent
+
+A basic invocation can be performed with:
 
 ```bash
 agentcore invoke "Where is my order?"
@@ -566,13 +827,23 @@ For session-aware testing:
 agentcore invoke --session-id <session-id>
 ```
 
-> Exact deployment behavior depends on the installed AgentCore Starter Toolkit version and the AWS environment.
+Customer-specific requests can provide a customer ID and session ID in the request payload.
+
+Example:
+
+```json
+{
+  "prompt": "What travel destination do I prefer?",
+  "customer_id": "CUST-FINAL",
+  "session_id": "example-session-id"
+}
+```
 
 ---
 
-## Example Requests
+# Example Requests
 
-### Product Question
+## Product Question
 
 ```text
 What is the return policy for this product?
@@ -585,14 +856,14 @@ Agent
   ↓
 Knowledge Base
   ↓
-Relevant policy information
+Relevant business information
   ↓
 Customer response
 ```
 
 ---
 
-### Order Tracking
+## Order Tracking
 
 ```text
 Where is my order ORD-001?
@@ -603,7 +874,7 @@ Expected flow:
 ```text
 Agent
   ↓
-Gateway
+AgentCore Gateway
   ↓
 Order Tracker Lambda
   ↓
@@ -614,7 +885,7 @@ Customer response
 
 ---
 
-### Customer Order History
+## Customer Order History
 
 ```text
 Show me my recent orders.
@@ -627,14 +898,14 @@ Agent
   ↓
 Gateway / MCP
   ↓
-Customer Orders API
+Customer Orders capability
   ↓
 Order history
 ```
 
 ---
 
-### Loyalty Discount
+## Loyalty Discount
 
 ```text
 I have 4250 loyalty points and a $200 device purchase. What discount can I get?
@@ -656,7 +927,7 @@ Discount result
 
 ---
 
-### Refund
+## Refund
 
 ```text
 I want a refund for ORD-001 because the product arrived damaged.
@@ -678,7 +949,7 @@ Customer response
 
 ---
 
-### Browser
+## Browser
 
 ```text
 Open the requested webpage and check the current information.
@@ -700,229 +971,562 @@ Extracted information
 
 ---
 
-## Design Principles
+## Cross-Session Memory
 
-### Tool-Based Architecture
+First interaction:
 
-Business capabilities are implemented as tools instead of placing all functionality inside the model prompt.
+```text
+Remember that I prefer Japan for travel and I like wireless headphones.
+```
 
-This makes the system easier to extend and maintain.
+Later, in a new session:
 
-### Grounded Responses
+```text
+What travel destination do I prefer, and what type of product do I like?
+```
 
-The agent is instructed to retrieve business information from the Knowledge Base rather than inventing product or policy information.
+The expected behavior is for AgentCore Memory to retrieve the relevant customer context and provide the stored preferences.
 
-### Deterministic Computation
+---
 
-Financial and loyalty calculations are delegated to Code Interpreter rather than relying on free-form model arithmetic.
+# Testing and Verification
 
-### Separation of Concerns
+The final implementation was tested through the deployed AgentCore Runtime.
+
+The memory workflow was specifically verified across separate sessions using the same customer actor ID.
+
+The test demonstrated that:
+
+```text
+Session A
+    │
+    ├── Customer states preferences
+    │
+    ▼
+AgentCore Memory
+    │
+    ▼
+Session B
+    │
+    ├── Same customer ID
+    │
+    ▼
+Memory retrieval
+    │
+    ▼
+Stored preferences returned
+```
+
+The deployed runtime successfully retrieved customer preferences including:
+
+```text
+Travel destination: Japan
+Product preference: Wireless headphones
+```
+
+This verifies the intended cross-session memory behavior.
+
+---
+
+# Memory Hook Lifecycle
+
+The memory implementation uses Strands hooks rather than manually saving memory from the runtime entrypoint.
+
+The relevant lifecycle is:
+
+```text
+MessageAddedEvent
+        │
+        ▼
+retrieve_customer_context()
+        │
+        ▼
+Relevant memories injected
+        │
+        ▼
+Agent invocation
+        │
+        ▼
+AfterInvocationEvent
+        │
+        ▼
+save_support_interaction()
+        │
+        ▼
+AgentCore Memory
+```
+
+The `AfterInvocationEvent` callback extracts the latest relevant user and assistant messages from the agent conversation and persists them using the AgentCore Memory client.
+
+This design keeps memory persistence coupled to the agent lifecycle and avoids a separate manual save operation in the runtime entrypoint.
+
+---
+
+# Design Principles
+
+## Tool-Based Architecture
+
+Business capabilities are implemented as tools rather than putting all functionality into the model prompt.
+
+This makes the system easier to extend, test, and maintain.
+
+---
+
+## Grounded Responses
+
+The agent is instructed to retrieve business-specific information from the Knowledge Base instead of relying exclusively on model knowledge.
+
+---
+
+## Deterministic Computation
+
+Calculations involving loyalty points and discounts are delegated to executable code through AgentCore Code Interpreter.
+
+This reduces the risk of relying on free-form model arithmetic for business calculations.
+
+---
+
+## Separation of Concerns
 
 The project separates:
 
 ```text
 Agent reasoning
-Knowledge retrieval
-Memory
-Browser interaction
-Business APIs
-Refund operations
-Code execution
+       │
+       ├── Knowledge retrieval
+       ├── Long-term memory
+       ├── Browser interaction
+       ├── Backend business tools
+       ├── Refund operations
+       └── Code execution
 ```
 
-This creates a cleaner architecture for future production integrations.
-
-### Modular Integrations
-
-Gateway/MCP allows additional backend tools to be introduced without rewriting the core agent.
+Each component has a clear responsibility.
 
 ---
 
-## Security Considerations
+## Modular Integrations
 
-The repository intentionally does not include:
+AgentCore Gateway and MCP provide a flexible interface for connecting additional backend capabilities.
+
+New tools can be introduced without requiring the entire agent architecture to be redesigned.
+
+---
+
+# Security Considerations
+
+The repository intentionally excludes sensitive credentials and deployment state.
+
+It does not contain:
 
 * AWS access keys
-* Secret keys
-* API credentials
-* Session credentials
-* Private tokens
+* AWS secret keys
+* Temporary session credentials
+* Private authentication tokens
 * `.env` files
 * AgentCore CLI deployment state
+* Other sensitive runtime credentials
 
-Generated AgentCore CLI state is excluded through `.gitignore`.
+The `.gitignore` configuration excludes local environment and AgentCore CLI state where appropriate.
 
-For production deployments, sensitive configuration should be managed through appropriate AWS services such as:
+For production deployments, sensitive configuration should be managed using AWS services such as:
 
 * IAM roles
 * AWS Secrets Manager
 * AWS Systems Manager Parameter Store
-* Environment-specific configuration
 
-Least-privilege IAM permissions should also be applied to the runtime and backend services.
+The AgentCore Runtime and Lambda functions should also use **least-privilege IAM permissions**.
+
+Customer-facing applications should additionally implement authentication and authorization before exposing customer-specific operations.
 
 ---
 
-## Current Limitations
+# Observability
 
-This repository is a **production-oriented reference implementation**, but several backend components are intentionally simplified for demonstration.
+AWS CloudWatch provides the primary logging layer for the deployed runtime.
 
-### Mock Customer Data
+Logs can be used to troubleshoot:
 
-The order tracker currently uses hard-coded demonstration data.
+* Agent invocation errors
+* Tool execution
+* Knowledge Base retrieval
+* Gateway/MCP requests
+* Memory retrieval
+* Memory persistence
+* Browser failures
+* Lambda execution
+* Deployment issues
+* Runtime errors
 
-A production implementation should replace this with a persistent database.
+A typical debugging workflow is:
 
-### Mock Refund Processing
+```text
+Agent invocation
+      │
+      ▼
+CloudWatch logs
+      │
+      ▼
+Identify failing component
+      │
+      ▼
+Inspect tool / memory / runtime behavior
+      │
+      ▼
+Apply targeted fix
+      │
+      ▼
+Redeploy
+      │
+      ▼
+Retest
+```
 
-The refund processor simulates refund operations.
+This approach was also used during development to diagnose the memory lifecycle and browser integration.
 
-A production system would integrate with an actual payment/refund provider.
+---
 
-### Demonstration Return Labels
+# Development Workflow
 
-Return-label generation is simulated rather than connected to a real shipping provider.
+A typical development cycle is:
 
-### Public Runtime
+```text
+1. Modify application/tool code
+          │
+          ▼
+2. Run local validation
+          │
+          ▼
+3. Test affected functionality
+          │
+          ▼
+4. Deploy AgentCore runtime
+          │
+          ▼
+5. Invoke with representative prompts
+          │
+          ▼
+6. Inspect CloudWatch logs
+          │
+          ▼
+7. Fix and retest
+          │
+          ▼
+8. Commit changes
+          │
+          ▼
+9. Push to GitHub
+```
 
-The current AgentCore configuration uses:
+Typical Git commands:
+
+```bash
+git status
+git add .
+git commit -m "describe the change"
+git push origin main
+```
+
+---
+
+# Production Considerations
+
+Although this is a production-oriented reference implementation, several components are intentionally simplified for demonstration.
+
+## Persistent Customer Data
+
+The current demonstration backend uses mock data.
+
+A production system should use a persistent transactional database such as:
+
+* DynamoDB
+* Aurora
+* RDS
+* An existing enterprise customer system
+
+---
+
+## Real Refund Integration
+
+The refund processor is a demonstration implementation.
+
+A production deployment should integrate with a real payment or financial system and implement:
+
+* Authentication
+* Authorization
+* Transaction validation
+* Idempotency
+* Audit logging
+* Failure recovery
+* Fraud controls
+
+---
+
+## Authentication and Customer Identity
+
+The demonstration accepts customer identifiers as part of the request.
+
+A production system should authenticate the customer and derive the customer identity from a trusted identity mechanism rather than allowing arbitrary customer IDs.
+
+---
+
+## Browser Security
+
+Browser automation should be carefully controlled in production.
+
+Recommended controls include:
+
+* URL/domain allowlists
+* Navigation restrictions
+* Authentication isolation
+* Credential protection
+* Timeouts
+* Rate limits
+* Tool-level authorization
+* Monitoring of browser actions
+
+---
+
+## Network Security
+
+The current AgentCore runtime configuration uses:
 
 ```text
 networkMode: PUBLIC
 ```
 
-A production environment may require a more restrictive networking and access model depending on the application's requirements.
+A production architecture should evaluate whether a more restrictive networking model is appropriate.
 
 ---
 
-## Future Improvements
+## Secrets Management
+
+Production deployments should avoid embedding credentials in source code.
+
+Sensitive values should be managed using appropriate AWS security services.
+
+---
+
+# Current Limitations
+
+The current project has several intentional limitations.
+
+### Demonstration Customer Data
+
+Customer and order information is based on demonstration data.
+
+### Demonstration Refund Processing
+
+Refund operations are simulated and do not charge or refund real payment accounts.
+
+### Simulated Return Labels
+
+Return-label generation is not connected to a real shipping provider.
+
+### Public Runtime Configuration
+
+The demonstration runtime uses public networking.
+
+### Basic Application-Level Guarding
+
+The project includes system-prompt instructions for tool selection and grounded responses, but a production system should additionally consider dedicated guardrails, policy enforcement, authorization, and validation layers.
+
+### Mock Business Systems
+
+The project is designed to demonstrate agent architecture rather than provide a complete production commerce backend.
+
+---
+
+# Future Improvements
 
 Potential production enhancements include:
 
 * DynamoDB-backed customer and order storage
 * Real payment/refund provider integration
 * Real shipping-provider integration
-* Authentication and customer identity verification
+* Customer authentication
+* Identity verification
 * Role-based authorization
 * Private networking where appropriate
 * AWS Secrets Manager integration
+* Parameter Store configuration
 * Automated CI/CD
-* Automated integration tests
+* Automated integration testing
 * Agent evaluation pipelines
 * Guardrails and policy enforcement
 * Structured observability dashboards
 * Cost monitoring
 * Conversation analytics
 * Human-agent escalation
-* Multi-language customer support
+* Multi-language support
 * Streaming responses
-* Persistent business transaction auditing
+* Business transaction auditing
+* Agent performance evaluation
+* Automated regression testing
+* Fine-grained tool authorization
 
 ---
 
-## Observability
-
-AgentCore and AWS logging can be used to inspect runtime behavior and troubleshoot:
-
-* Agent invocation errors
-* Tool execution
-* Browser failures
-* Knowledge Base retrieval
-* Gateway/MCP calls
-* Memory operations
-* Lambda execution
-* Runtime deployment issues
-
-CloudWatch should be used as the primary operational logging layer for deployed workloads.
-
----
-
-## Development Workflow
-
-A typical development cycle is:
-
-```text
-1. Modify agent/tool code
-        ↓
-2. Run local validation
-        ↓
-3. Test individual tools
-        ↓
-4. Deploy AgentCore runtime
-        ↓
-5. Invoke with representative prompts
-        ↓
-6. Inspect CloudWatch logs
-        ↓
-7. Fix / improve
-        ↓
-8. Commit changes
-        ↓
-9. Push to GitHub
-```
-
-Git workflow:
-
-```bash
-git add .
-git commit -m "describe the change"
-git push
-```
-
----
-
-## What This Project Demonstrates
+# What This Project Demonstrates
 
 This project brings together several important concepts in modern AI engineering:
 
 * AI agent orchestration
+* Strands Agents
 * Tool calling
 * Retrieval-augmented generation
 * Long-term agent memory
+* Cross-session customer context
 * MCP-based integrations
+* AgentCore Gateway
 * Serverless backend services
 * Browser automation
 * Code execution
+* Knowledge-grounded responses
 * AWS managed AI infrastructure
 * Agent deployment
 * Cloud observability
 * Modular agent architecture
 
-Rather than building a chatbot that only generates text, the project demonstrates an agent capable of **reasoning about a customer request and selecting the appropriate external capability to complete the task**.
+The project demonstrates a shift from a traditional chatbot toward an **agentic application**.
+
+Instead of only generating text, the system can:
+
+```text
+Understand the request
+        ↓
+Determine what capability is required
+        ↓
+Select an appropriate tool
+        ↓
+Retrieve or execute information
+        ↓
+Use customer context
+        ↓
+Generate a grounded response
+```
+
+This architecture provides a foundation for building more capable AI-powered business applications.
 
 ---
 
-## Repository
+# Key Engineering Lessons
 
-**GitHub:** `frazcodes/customer-support-ai-agent`
+This project provided practical experience with several important AI engineering patterns.
 
-The repository contains the source code, AgentCore configuration, Lambda integrations, dependency configuration, and supporting project files required to reproduce the application in a suitably configured AWS environment.
+### 1. Agents Need Tools
+
+A language model alone is not sufficient for reliable business operations.
+
+External tools allow the agent to interact with:
+
+* Databases
+* APIs
+* Business systems
+* Browsers
+* Code execution environments
+* Knowledge bases
 
 ---
 
-## Author
+### 2. Memory Requires Lifecycle Integration
 
-**Ahmad Faraz**
+Long-term memory is more than storing text.
 
-Information Technology student and aspiring **AI Engineer / Full Stack Developer** focused on building AI-powered applications using Python, React, FastAPI, AWS, and modern agent technologies.
+The application must decide:
+
+```text
+What should be retrieved?
+When should it be retrieved?
+Which customer does it belong to?
+When should new information be persisted?
+```
+
+Using Strands lifecycle hooks provides a clean mechanism for integrating these operations.
+
+---
+
+### 3. Grounding Reduces Hallucination
+
+Business-specific information should come from trusted sources rather than being invented by the model.
+
+The Knowledge Base and backend tools therefore act as sources of truth for their respective domains.
+
+---
+
+### 4. Deterministic Logic Should Stay Deterministic
+
+Business calculations should not depend entirely on probabilistic model reasoning.
+
+Code Interpreter provides a mechanism for executing deterministic calculation logic while allowing the agent to decide when that capability is needed.
+
+---
+
+### 5. Modular Architecture Improves Maintainability
+
+Separating:
+
+```text
+Agent
+Knowledge
+Memory
+Browser
+Gateway
+Lambda
+Code Execution
+```
+
+makes the system easier to debug and evolve.
+
+---
+
+# Repository
+
+**GitHub Repository:** `frazcodes/customer-support-ai-agent`
+
+The repository contains:
+
+* AgentCore runtime configuration
+* Strands agent implementation
+* Knowledge Base integration
+* AgentCore Memory integration
+* AgentCore Browser integration
+* AgentCore Code Interpreter integration
+* AgentCore Gateway/MCP integration
+* Lambda backend tools
+* Dependency configuration
+* Project documentation
+* Reflection document
+
+---
+
+# Author
+
+## Ahmad Faraz
+
+**BS Information Technology**
+
+Aspiring **AI Engineer and Full Stack Developer** focused on building AI-powered applications and modern cloud-native software.
 
 ### Areas of Focus
 
 * AI Engineering
 * Agentic AI
-* AWS Bedrock
+* Amazon Bedrock
 * Amazon Bedrock AgentCore
 * Strands Agents
 * Python
 * Full Stack Development
 * React
 * FastAPI
-* Cloud & Serverless Architecture
+* Cloud Computing
+* Serverless Architecture
+* AWS
 
 ---
 
-## License
+# License
 
-This project is intended primarily as a learning and portfolio project demonstrating modern AI agent architecture on AWS.
+This project is primarily intended as a learning, portfolio, and reference implementation demonstrating modern AI agent architecture on AWS.
 
-Add an appropriate open-source license before distributing the project for reuse.
+Before distributing the project for public reuse, add an appropriate open-source license such as MIT, Apache-2.0, or another license suitable for the intended use.
