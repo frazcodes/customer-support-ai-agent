@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+agentcore/.cli/
+main.py.memory-backup
+.DS_Store
+
+# AgentCore generated cache
+agentcore/.cache/
