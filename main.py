@@ -231,10 +231,30 @@ class MemoryHook(HookProvider):
 
     def save_support_interaction(
         self,
-        customer_query: str,
-        agent_response: str,
+        event: AfterInvocationEvent,
     ) -> None:
-        """Save one completed customer-support turn to long-term memory."""
+        """Save the last customer query and assistant response to long-term memory."""
+        messages = getattr(event.agent, "messages", [])
+        customer_query = ""
+        agent_response = ""
+
+        for i, message in enumerate(reversed(messages)):
+            if not isinstance(message, dict):
+                continue
+
+            role = message.get("role")
+            text = self._extract_text(message)
+            if not text:
+                continue
+
+            if not agent_response and role == "assistant":
+                agent_response = text
+            elif not customer_query and role == "user":
+                customer_query = text
+
+            if customer_query and agent_response:
+                break
+
         if not customer_query or not agent_response:
             logger.warning(
                 "Memory save skipped: customer_query=%s, agent_response=%s",
@@ -269,10 +289,14 @@ class MemoryHook(HookProvider):
             logger.exception("Memory save failed: %s", exc)
 
     def register_hooks(self, registry: HookRegistry) -> None:  # type: ignore
-        """Register the memory retrieval callback."""
+        """Register memory retrieval and persistence callbacks."""
         registry.add_callback(
             MessageAddedEvent,
             self.retrieve_customer_context,
+        )
+        registry.add_callback(
+            AfterInvocationEvent,
+            self.save_support_interaction,
         )
 
 
@@ -588,27 +612,6 @@ Be concise, accurate, friendly, and transparent.
                 final_response = content[0].get("text", str(response))
             else:
                 final_response = str(response)
-
-            # Save the completed turn directly instead of relying on
-            # AfterInvocationEvent.agent.messages. The runtime entrypoint
-            # already has the exact customer query and final response.
-            logger.warning(
-                "MEMORY_SAVE_START actor=%s session=%s query=%s",
-                actor_id,
-                session_id,
-                user_input,
-            )
-
-            memory_hook.save_support_interaction(
-                customer_query=user_input,
-                agent_response=final_response,
-            )
-
-            logger.warning(
-                "MEMORY_SAVE_END actor=%s session=%s",
-                actor_id,
-                session_id,
-            )
 
             return final_response
 
